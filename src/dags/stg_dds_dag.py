@@ -1,20 +1,23 @@
+import os
 from datetime import datetime
 from airflow.decorators import dag, task
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.common.sql.hooks.sql import DbApiHook
+from airflow.providers.vertica.operators.vertica import VerticaOperator
 
 @dag(
-     dag_id='s3_upload_incremental_2022_v4',
+     dag_id='s3_upload_incremental_2022_to_stg_and_dds',
     default_args={
-        'owner': 'dwh_team',
+        'owner': 'student',
         'depends_on_past': False
     },
-    schedule_interval='@daily',       
+    schedule_interval='@daily', 
+    template_searchpath=[os.path.join(os.path.dirname(__file__), 'sql')],      
     start_date=datetime(2022, 11, 1),  
     end_date=datetime(2022, 11, 10), 
     catchup=True,                     
     max_active_runs=1,                
-    tags=['stg'],
+    tags=['stg', 'dds'],
 )
 def s3_load():
     @task
@@ -70,9 +73,7 @@ def s3_load():
             cursor.execute(f"COPY VT260501BE9A82__STAGING.transactions FROM LOCAL '{local_path}' DELIMITER ',' SKIP 1;")
             conn.commit()
             cursor.close()
-            conn.close()       
-
-
+            conn.close()     
 
         # код для инкрементальной загрузки по датам, который МОГ БЫ БЫТЬ 
         # file_keys = s3_hook.list_keys(bucket_name=bucket_name, prefix='transactions_batch')
@@ -82,9 +83,16 @@ def s3_load():
         #     if load_time == parsed_date:
         #         file_key = obj['Key']
         #         s3_hook.get_key(file_key, bucket_name).download_file(local_path)    
+    
+        
+    update_dds = VerticaOperator(
+        task_id='update_dds_layer',
+        vertica_conn_id='vertica_conn',
+        sql='stg_to_dds.sql'
+        )      
 
-    # 3. Call the task to add it to the DAG topology
-    download_currencies() >> download_transactions_current_batch()
 
-# 4. Instantiate the DAG
+    download_currencies() >> download_transactions_current_batch() >> update_dds
+
+
 s3_load()
