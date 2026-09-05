@@ -11,7 +11,7 @@ from airflow.providers.vertica.operators.vertica import VerticaOperator
     },
     schedule_interval='@daily', 
     template_searchpath=[os.path.join(os.path.dirname(__file__), 'sql')],      
-    start_date=datetime(2022, 11, 01), #последние актуальные данные в учебном датасете 
+    start_date=datetime(2022, 11, 1), #последние актуальные данные в учебном датасете 
     catchup=False,                     
     max_active_runs=1,                
     tags=['cdm'],
